@@ -1,0 +1,19 @@
+[package]
+name = "cla-jwt-verifier"
+version = "0.1.0"
+authors = ["Yusuke Miyazaki <miyazaki.dev@gmail.com>"]
+edition = "2018"
+description = "Simple HTTP server to verify JWT sent by Cloudflare Access"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+config = "0.9"
+env_logger = "0.7"
+jsonwebtoken = "7"
+log = "0.4.0"
+reqwest = { version = "0.10", features = ["json"] }
+serde = {version = "1.0", features = ["derive"] }
+tokio = { version = "0.2", features = ["macros"] }
+warp = "0.2"
