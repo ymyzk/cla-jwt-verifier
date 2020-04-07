@@ -1,0 +1,27 @@
+on: [push]
+
+name: CI
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache .cargo/registry
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Show Rust environment
+        run: |
+          rustup --version
+          rustup show
+      - uses: actions-rs/cargo@v1
+        name: cargo build
+        with:
+          command: build
+      - uses: actions-rs/cargo@v1
+        name: cargo test
+        with:
+          command: test
