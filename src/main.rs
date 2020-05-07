@@ -3,9 +3,14 @@ extern crate log;
 
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::hash_map::{Entry, HashMap};
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::time::{Duration, Instant};
 use warp::http::StatusCode;
 use warp::Filter;
+
+const CACHE_TTL: Duration = Duration::from_secs(300);
 
 /// JWT Claims
 /// https://tools.ietf.org/html/rfc7519#section-4
@@ -69,15 +74,50 @@ struct ErrorMessage {
     message: String,
 }
 
+type JWKCache = Arc<Mutex<HashMap<String, (Instant, JWKSet)>>>;
+
+fn init_cache() -> JWKCache {
+    Arc::new(Mutex::new(HashMap::new()))
+}
+
+/// Get JWK Set from a cache or download it from a given URL and store to the cache.
+async fn download_jwks_with_cache(
+    cache: JWKCache,
+    url: &str,
+) -> Result<JWKSet, Box<dyn std::error::Error>> {
+    let mut cache = cache.lock().await;
+    let now = Instant::now();
+    let jwks = match cache.entry(url.to_string()) {
+        Entry::Vacant(entry) => {
+            let jwks = download_jwks(&url).await?;
+            entry.insert((now, jwks.to_owned()));
+            jwks
+        }
+        Entry::Occupied(mut entry) => {
+            let (ts, jwks) = entry.get();
+            if ts.elapsed() < CACHE_TTL {
+                jwks.to_owned()
+            } else {
+                debug!("JWK Set cache has expired");
+                let jwks = download_jwks(&url).await?;
+                entry.insert((now, jwks.to_owned()));
+                jwks
+            }
+        }
+    };
+    Ok(jwks)
+}
+
 /// Download JWK Set from a given URL
 async fn download_jwks(url: &str) -> Result<JWKSet, Box<dyn std::error::Error>> {
+    debug!("Downloading JWK Set from {:?}", url);
     Ok(reqwest::get(url).await?.json::<JWKSet>().await?)
 }
 
 fn verify_token(
     token: &str,
     validation: &jsonwebtoken::Validation,
-    jwks: JWKSet,
+    jwks: &JWKSet,
 ) -> Result<jsonwebtoken::TokenData<Claims>, Box<dyn std::error::Error>> {
     let header = jsonwebtoken::decode_header(token)?;
     debug!("Decoded header: {:?}", header);
@@ -99,10 +139,11 @@ fn verify_token(
 
 async fn auth_handle(
     token: String,
+    cache: JWKCache,
     certs_url: String,
     validation: jsonwebtoken::Validation,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let jwks = match download_jwks(&certs_url).await {
+    let jwks = match download_jwks_with_cache(cache, &certs_url).await {
         Ok(v) => v,
         Err(e) => {
             return Ok(warp::reply::with_status(
@@ -113,8 +154,9 @@ async fn auth_handle(
             ))
         }
     };
+
     debug!("JWK Set: {:?}", jwks);
-    let decoded = match verify_token(&token, &validation, jwks) {
+    let decoded = match verify_token(&token, &validation, &jwks) {
         Ok(r) => r,
         Err(e) => {
             return Ok(warp::reply::with_status(
@@ -133,6 +175,7 @@ async fn auth_handle(
 }
 
 fn get_filters(
+    cache: JWKCache,
     certs_url: String,
     validation: jsonwebtoken::Validation,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -140,6 +183,7 @@ fn get_filters(
         .and(warp::get())
         // This header is required
         .and(warp::header::<String>("Cf-Access-Jwt-Assertion"))
+        .and(warp::any().map(move || cache.clone()))
         .and(warp::any().map(move || certs_url.clone()))
         .and(warp::any().map(move || validation.clone()))
         .and_then(auth_handle);
@@ -172,7 +216,7 @@ async fn main() {
     );
 
     // Prepare warp filters
-    let listen = settings.get_str("listen").unwrap();
+    let cache = init_cache();
     let certs_url = settings
         .get_str("certs_url")
         .expect("APP_CERTS_URL is required");
@@ -180,7 +224,8 @@ async fn main() {
     let audiences: Vec<&str> = audience_str.split(",").map(|s| s.trim()).collect();
     let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
     validation.set_audience(&audiences);
-    let routes = get_filters(certs_url.to_string(), validation);
+    let routes = get_filters(cache, certs_url.to_string(), validation);
+    let listen = settings.get_str("listen").unwrap();
     let addr: std::net::SocketAddr = listen
         .parse()
         .expect(&format!("Failed to parse '{}' as SocketAddr", listen));
@@ -196,18 +241,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_root_not_found() {
+        let cache = super::init_cache();
         let certs_url = "https://sample.cloudflareaccess.com/cdn-cgi/access/certs";
         let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        let routes = super::get_filters(certs_url.to_string(), validation);
+        let routes = super::get_filters(cache, certs_url.to_string(), validation);
         let resp = request().method("GET").path("/").reply(&routes).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]
     async fn test_auth_without_header() {
+        let cache = super::init_cache();
         let certs_url = "https://sample.cloudflareaccess.com/cdn-cgi/access/certs";
         let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        let routes = super::get_filters(certs_url.to_string(), validation);
+        let routes = super::get_filters(cache, certs_url.to_string(), validation);
         let resp = request().method("GET").path("/auth").reply(&routes).await;
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
