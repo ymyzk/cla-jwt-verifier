@@ -32,19 +32,19 @@ struct Claims {
     identity_nonce: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 enum KeyType {
     RSA,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 enum KeyAlgorithm {
     RS256,
 }
 
 /// JWK (RSA/RS256 only)
 /// https://tools.ietf.org/html/rfc7517#section-4
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 struct JWK {
     kty: KeyType,
     #[serde(rename(deserialize = "use"))]
@@ -58,7 +58,7 @@ struct JWK {
 
 /// JWK Set
 /// https://tools.ietf.org/html/rfc7517#section-5
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 struct JWKSet {
     keys: Vec<JWK>,
 }
@@ -235,8 +235,67 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use mockito::{mock, server_url};
+    use std::path::PathBuf;
+    use tokio::fs;
     use warp::http::StatusCode;
     use warp::test::request;
+
+    async fn read_fixture(file: &str) -> String {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("tests/fixtures");
+        path.push(file);
+        fs::read_to_string(path)
+            .await
+            .expect("failed to read a test fixture")
+    }
+
+    #[tokio::test]
+    async fn test_download_jwks_works() {
+        let _m = mock("GET", "/cdn-cgi/access/certs")
+            .with_status(200)
+            .with_header("content-type", "application/json; charset=utf-8")
+            .with_body(read_fixture("key1_jwks.json").await)
+            .create();
+        let url = format!("{}/cdn-cgi/access/certs", &server_url());
+        let result = super::download_jwks(&url).await;
+        let expected = super::JWKSet {
+            keys: vec![
+                super::JWK {
+                    kty: super::KeyType::RSA,
+                    use_: Some("sig".to_string()),
+                    alg: Some(super::KeyAlgorithm::RS256),
+                    kid: Some("key1".to_string()),
+                    n: "x66ZeMvBm8o0qAiKjFsMCVcc34nd_vq-68zI1f89P4EfPk2ohRH8KCy8u4ZNV7_CLY3eBeUqB-4avjZ0I-O23H1JjdXMhVvxzu7iNoWnJV2cl1oXv7OTF7MFrcRiI0hqHh8REmseMkngICP0SwVXTcrvuhYfCrdCLENVeNDoI9pRZyvKl2NyKORhG0qBD6iCfbXDJXoN0ZThs28E9uVedeH4z9YYRe_9ld5cwMls6HiFoSYGLU7Lv2HGPH2eYRIcm4fkLXRV6Sv2ca9BcYfT7l__bW2iTq4Uhs7SdV1AKbBiHf1-ac4GyU-82y1Y9W2HtocMz8YmsXdWH0Rg-eaafw".to_string(),
+                    e: "AQAB".to_string(),
+                }
+            ]
+        };
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), expected)
+    }
+
+    #[tokio::test]
+    async fn test_download_jwks_http_error() {
+        let _m = mock("GET", "/cdn-cgi/access/certs")
+            .with_status(404)
+            .create();
+        let url = format!("{}/cdn-cgi/access/certs", &server_url());
+        let result = super::download_jwks(&url).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_download_jwks_unsupported_key() {
+        let _m = mock("GET", "/cdn-cgi/access/certs")
+            .with_status(200)
+            .with_header("content-type", "application/json; charset=utf-8")
+            .with_body(read_fixture("key2_jwks_unsupported.json").await)
+            .create();
+        let url = format!("{}/cdn-cgi/access/certs", &server_url());
+        let result = super::download_jwks(&url).await;
+        assert!(result.is_err());
+    }
 
     #[tokio::test]
     async fn test_root_not_found() {
