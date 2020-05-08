@@ -10,6 +10,7 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates tini
 COPY --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/cla-jwt-verifier /
 
+ENV RUST_LOG="cla_jwt_verifier=info"
 USER nobody
 ENTRYPOINT ["/sbin/tini", "/cla-jwt-verifier"]
 EXPOSE 3030

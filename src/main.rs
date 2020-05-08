@@ -187,10 +187,9 @@ fn get_filters(
         .and(warp::any().map(move || certs_url.clone()))
         .and(warp::any().map(move || validation.clone()))
         .and_then(auth_handle);
-    let hello = warp::path!("hello" / String)
-        .and(warp::get())
-        .map(|name| format!("Hello, {}!", name));
-    auth.or(hello)
+    // Use auth.or(another_endpoint).with(warp::log("cla_jwt_verifier"))
+    // to add additional endpoints
+    auth.with(warp::log("cla_jwt_verifier"))
 }
 
 #[tokio::main]
