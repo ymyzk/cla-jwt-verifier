@@ -167,7 +167,7 @@ async fn auth_handle(
             ))
         }
     };
-    println!("Decoded JWT: {:?}", decoded);
+    debug!("Decoded JWT: {:?}", decoded);
     Ok(warp::reply::with_status(
         warp::reply::json(&decoded.claims),
         StatusCode::OK,
