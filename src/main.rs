@@ -300,7 +300,7 @@ mod tests {
     #[tokio::test]
     async fn test_root_not_found() {
         let cache = super::init_cache();
-        let certs_url = "https://sample.cloudflareaccess.com/cdn-cgi/access/certs";
+        let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         let routes = super::get_filters(cache, certs_url.to_string(), validation);
         let resp = request().method("GET").path("/").reply(&routes).await;
@@ -310,7 +310,7 @@ mod tests {
     #[tokio::test]
     async fn test_auth_without_header() {
         let cache = super::init_cache();
-        let certs_url = "https://sample.cloudflareaccess.com/cdn-cgi/access/certs";
+        let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         let routes = super::get_filters(cache, certs_url.to_string(), validation);
         let resp = request().method("GET").path("/auth").reply(&routes).await;
