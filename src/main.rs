@@ -308,6 +308,98 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_auth_validates() {
+        let _m = mock("GET", "/cdn-cgi/access/certs")
+            .with_status(200)
+            .with_header("content-type", "application/json; charset=utf-8")
+            .with_body(read_fixture("key1_jwks.json").await)
+            .create();
+        let cache = super::init_cache();
+        let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_audience(&vec!["AUDIENCE1"]);
+        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let jwt = read_fixture("key1_jwt_valid.txt").await;
+        let resp = request()
+            .method("GET")
+            .path("/auth")
+            .header("Cf-Access-Jwt-Assertion", jwt.trim_end())
+            .reply(&routes)
+            .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.body(), r#"{"iss":"https://example.cloudflareaccess.com","sub":"SUBJECT1","aud":["AUDIENCE1"],"exp":4742516436,"nbf":1588916436,"iat":1588916436,"jti":null,"email":"user@example.com","type":"app","identity_nonce":"NONCE1"}"#);
+    }
+
+    #[tokio::test]
+    async fn test_auth_invalid_audience() {
+        let _m = mock("GET", "/cdn-cgi/access/certs")
+            .with_status(200)
+            .with_header("content-type", "application/json; charset=utf-8")
+            .with_body(read_fixture("key1_jwks.json").await)
+            .create();
+        let cache = super::init_cache();
+        let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_audience(&vec!["INVALID_AUDIENCE"]);
+        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let jwt = read_fixture("key1_jwt_valid.txt").await;
+        let resp = request()
+            .method("GET")
+            .path("/auth")
+            .header("Cf-Access-Jwt-Assertion", jwt.trim_end())
+            .reply(&routes)
+            .await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(resp.body(), r#"{"message":"Failed to validate JWT: InvalidAudience"}"#);
+    }
+
+    #[tokio::test]
+    async fn test_auth_expired() {
+        let _m = mock("GET", "/cdn-cgi/access/certs")
+            .with_status(200)
+            .with_header("content-type", "application/json; charset=utf-8")
+            .with_body(read_fixture("key1_jwks.json").await)
+            .create();
+        let cache = super::init_cache();
+        let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_audience(&vec!["AUDIENCE1"]);
+        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let jwt = read_fixture("key1_jwt_expired.txt").await;
+        let resp = request()
+            .method("GET")
+            .path("/auth")
+            .header("Cf-Access-Jwt-Assertion", jwt.trim_end())
+            .reply(&routes)
+            .await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(resp.body(), r#"{"message":"Failed to validate JWT: ExpiredSignature"}"#);
+    }
+
+    #[tokio::test]
+    async fn test_auth_wrong_key() {
+        let _m = mock("GET", "/cdn-cgi/access/certs")
+            .with_status(200)
+            .with_header("content-type", "application/json; charset=utf-8")
+            .with_body(read_fixture("key3_jwks.json").await)
+            .create();
+        let cache = super::init_cache();
+        let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_audience(&vec!["AUDIENCE1"]);
+        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let jwt = read_fixture("key1_jwt_valid.txt").await;
+        let resp = request()
+            .method("GET")
+            .path("/auth")
+            .header("Cf-Access-Jwt-Assertion", jwt.trim_end())
+            .reply(&routes)
+            .await;
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(resp.body(), r#"{"message":"Failed to validate JWT: Could not find a key matching with kid = key1"}"#);
+    }
+
+    #[tokio::test]
     async fn test_auth_without_header() {
         let cache = super::init_cache();
         let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
