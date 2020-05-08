@@ -3,7 +3,7 @@ name = "cla-jwt-verifier"
 version = "0.1.0"
 authors = ["Yusuke Miyazaki <miyazaki.dev@gmail.com>"]
 edition = "2018"
-description = "Simple HTTP server to verify JWT sent by Cloudflare Access"
+description = "Simple HTTP server for verifying JWT issued by Cloudflare Access"
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

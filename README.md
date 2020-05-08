@@ -1,5 +1,7 @@
 # cla-jwt-verifier
-Simple HTTP server to verify JWT issued by [Cloudflare Access](https://teams.cloudflare.com/access/).
+![CI](https://github.com/ymyzk/cla-jwt-verifier/workflows/CI/badge.svg)
+
+Simple HTTP server for verifying JWT issued by [Cloudflare Access](https://teams.cloudflare.com/access/).
 
 ## Usage
 1. Start cla-jwt-verifier
@@ -22,6 +24,9 @@ cla-jwt-verifier reads configurations from environment variables.
 - `APP_AUDIENCES` (required)
 - `APP_LISTEN` (optional)
 - `RUST_LOG` (optional)
+
+## Docker
+The Docker image is also available on [Docker Hub](https://hub.docker.com/repository/docker/ymyzk/cla-jwt-verifier).
 
 ## Reference
 - [Validating JSON Web Tokens - Cloudflare Access](https://developers.cloudflare.com/access/setting-up-access/validate-jwt-tokens/)
