@@ -11,7 +11,7 @@ APP_AUDIENCES=<audience1>,<audience2> \
 RUST_LOG=cla_jwt_verifier=info \
 cargo run
 ```
-2. Verify a JWT token
+2. Verify a JWT token using cla-jwt-verifier. cla-jwt-verifier always get a token from the HTTP header not HTTP Cookie.
 ```shell
 curl -v -H 'Cf-Access-Jwt-Assertion: <token>' localhost:3030/auth
 ```
