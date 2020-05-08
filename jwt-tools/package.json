@@ -1,0 +1,10 @@
+{
+  "name": "cla-jwt-verifier-jwt-tools",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "jsonwebtoken": "^8.5.1"
+  },
+  "author": "Yusuke Miyazaki",
+  "license": "MIT"
+}
