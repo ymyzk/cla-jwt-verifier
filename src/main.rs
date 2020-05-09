@@ -1,5 +1,7 @@
+mod models;
+
+use crate::models::{Claims, JWKSet};
 use log::{debug, info};
-use serde::Deserialize;
 use serde::Serialize;
 use std::collections::hash_map::{Entry, HashMap};
 use std::sync::Arc;
@@ -9,63 +11,6 @@ use warp::http::StatusCode;
 use warp::Filter;
 
 const CACHE_TTL: Duration = Duration::from_secs(300);
-
-/// JWT Claims
-/// https://tools.ietf.org/html/rfc7519#section-4
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct Claims {
-    // Registered Claim Names
-    iss: Option<String>,
-    sub: Option<String>,
-    aud: Vec<String>,
-    exp: Option<i64>,
-    nbf: Option<i64>,
-    iat: Option<i64>,
-    jti: Option<String>,
-    // Private Claim Names?
-    email: String,
-    // "type" is a strict keyword of Rust
-    #[serde(rename(deserialize = "type", serialize = "type"))]
-    type_: String,
-    identity_nonce: String,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-enum KeyType {
-    RSA,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-enum KeyAlgorithm {
-    RS256,
-}
-
-/// JWK (RSA/RS256 only)
-/// https://tools.ietf.org/html/rfc7517#section-4
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-struct JWK {
-    kty: KeyType,
-    #[serde(rename(deserialize = "use"))]
-    use_: Option<String>,
-    alg: Option<KeyAlgorithm>,
-    kid: Option<String>,
-    // RSA
-    n: String,
-    e: String,
-}
-
-/// JWK Set
-/// https://tools.ietf.org/html/rfc7517#section-5
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-struct JWKSet {
-    keys: Vec<JWK>,
-}
-
-impl JWKSet {
-    fn find(&self, kid: &str) -> Option<&JWK> {
-        self.keys.iter().find(|jwk| jwk.kid == Some(kid.into()))
-    }
-}
 
 #[derive(Clone, Debug, Serialize)]
 struct ErrorMessage {
@@ -233,6 +178,7 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use crate::models::{JWK, JWKSet, KeyAlgorithm, KeyType};
     use mockito::{mock, server_url};
     use std::path::PathBuf;
     use tokio::fs;
@@ -257,12 +203,12 @@ mod tests {
             .create();
         let url = format!("{}/cdn-cgi/access/certs", &server_url());
         let result = super::download_jwks(&url).await;
-        let expected = super::JWKSet {
+        let expected = JWKSet {
             keys: vec![
-                super::JWK {
-                    kty: super::KeyType::RSA,
+                JWK {
+                    kty: KeyType::RSA,
                     use_: Some("sig".to_string()),
-                    alg: Some(super::KeyAlgorithm::RS256),
+                    alg: Some(KeyAlgorithm::RS256),
                     kid: Some("key1".to_string()),
                     n: "x66ZeMvBm8o0qAiKjFsMCVcc34nd_vq-68zI1f89P4EfPk2ohRH8KCy8u4ZNV7_CLY3eBeUqB-4avjZ0I-O23H1JjdXMhVvxzu7iNoWnJV2cl1oXv7OTF7MFrcRiI0hqHh8REmseMkngICP0SwVXTcrvuhYfCrdCLENVeNDoI9pRZyvKl2NyKORhG0qBD6iCfbXDJXoN0ZThs28E9uVedeH4z9YYRe_9ld5cwMls6HiFoSYGLU7Lv2HGPH2eYRIcm4fkLXRV6Sv2ca9BcYfT7l__bW2iTq4Uhs7SdV1AKbBiHf1-ac4GyU-82y1Y9W2HtocMz8YmsXdWH0Rg-eaafw".to_string(),
                     e: "AQAB".to_string(),
