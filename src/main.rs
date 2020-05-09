@@ -1,6 +1,4 @@
-#[macro_use]
-extern crate log;
-
+use log::{debug, info};
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::hash_map::{Entry, HashMap};
