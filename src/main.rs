@@ -25,7 +25,7 @@ fn init_cache() -> JWKCache {
 
 /// Get JWK Set from a cache or download it from a given URL and store to the cache.
 async fn download_jwks_with_cache(
-    cache: JWKCache,
+    cache: &JWKCache,
     url: &str,
 ) -> Result<JWKSet, Box<dyn std::error::Error>> {
     let mut cache = cache.lock().await;
@@ -86,7 +86,7 @@ async fn auth_handle(
     certs_url: String,
     validation: jsonwebtoken::Validation,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let jwks = match download_jwks_with_cache(cache, &certs_url).await {
+    let jwks = match download_jwks_with_cache(&cache, &certs_url).await {
         Ok(v) => v,
         Err(e) => {
             return Ok(warp::reply::with_status(
@@ -117,7 +117,7 @@ async fn auth_handle(
     ))
 }
 
-fn get_filters(
+fn get_routes(
     cache: JWKCache,
     certs_url: String,
     validation: jsonwebtoken::Validation,
@@ -166,7 +166,7 @@ async fn main() {
     let audiences: Vec<&str> = audience_str.split(",").map(|s| s.trim()).collect();
     let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
     validation.set_audience(&audiences);
-    let routes = get_filters(cache, certs_url.to_string(), validation);
+    let routes = get_routes(cache, certs_url.to_string(), validation);
     let listen = settings.get_str("listen").unwrap();
     let addr: std::net::SocketAddr = listen
         .parse()
@@ -246,7 +246,7 @@ mod tests {
         let cache = super::init_cache();
         let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let routes = super::get_routes(cache, certs_url.to_string(), validation);
         let resp = request().method("GET").path("/").reply(&routes).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
@@ -262,7 +262,7 @@ mod tests {
         let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&vec!["AUDIENCE1"]);
-        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let routes = super::get_routes(cache, certs_url.to_string(), validation);
         let jwt = read_fixture("key1_jwt_valid.txt").await;
         let resp = request()
             .method("GET")
@@ -271,7 +271,10 @@ mod tests {
             .reply(&routes)
             .await;
         assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(resp.body(), r#"{"iss":"https://example.cloudflareaccess.com","sub":"SUBJECT1","aud":["AUDIENCE1"],"exp":4742516436,"nbf":1588916436,"iat":1588916436,"jti":null,"email":"user@example.com","type":"app","identity_nonce":"NONCE1"}"#);
+        assert_eq!(
+            resp.body(),
+            r#"{"iss":"https://example.cloudflareaccess.com","sub":"SUBJECT1","aud":["AUDIENCE1"],"exp":4742516436,"nbf":1588916436,"iat":1588916436,"jti":null,"email":"user@example.com","type":"app","identity_nonce":"NONCE1"}"#
+        );
     }
 
     #[tokio::test]
@@ -285,7 +288,7 @@ mod tests {
         let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&vec!["INVALID_AUDIENCE"]);
-        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let routes = super::get_routes(cache, certs_url.to_string(), validation);
         let jwt = read_fixture("key1_jwt_valid.txt").await;
         let resp = request()
             .method("GET")
@@ -294,7 +297,10 @@ mod tests {
             .reply(&routes)
             .await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(resp.body(), r#"{"message":"Failed to validate JWT: InvalidAudience"}"#);
+        assert_eq!(
+            resp.body(),
+            r#"{"message":"Failed to validate JWT: InvalidAudience"}"#
+        );
     }
 
     #[tokio::test]
@@ -308,7 +314,7 @@ mod tests {
         let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&vec!["AUDIENCE1"]);
-        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let routes = super::get_routes(cache, certs_url.to_string(), validation);
         let jwt = read_fixture("key1_jwt_expired.txt").await;
         let resp = request()
             .method("GET")
@@ -317,7 +323,10 @@ mod tests {
             .reply(&routes)
             .await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(resp.body(), r#"{"message":"Failed to validate JWT: ExpiredSignature"}"#);
+        assert_eq!(
+            resp.body(),
+            r#"{"message":"Failed to validate JWT: ExpiredSignature"}"#
+        );
     }
 
     #[tokio::test]
@@ -331,7 +340,7 @@ mod tests {
         let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&vec!["AUDIENCE1"]);
-        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let routes = super::get_routes(cache, certs_url.to_string(), validation);
         let jwt = read_fixture("key1_jwt_valid.txt").await;
         let resp = request()
             .method("GET")
@@ -340,7 +349,10 @@ mod tests {
             .reply(&routes)
             .await;
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
-        assert_eq!(resp.body(), r#"{"message":"Failed to validate JWT: Could not find a key matching with kid = key1"}"#);
+        assert_eq!(
+            resp.body(),
+            r#"{"message":"Failed to validate JWT: Could not find a key matching with kid = key1"}"#
+        );
     }
 
     #[tokio::test]
@@ -348,7 +360,7 @@ mod tests {
         let cache = super::init_cache();
         let certs_url = format!("{}/cdn-cgi/access/certs", &server_url());
         let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        let routes = super::get_filters(cache, certs_url.to_string(), validation);
+        let routes = super::get_routes(cache, certs_url.to_string(), validation);
         let resp = request().method("GET").path("/auth").reply(&routes).await;
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
