@@ -4,7 +4,7 @@ name: CI
 
 jobs:
   build-and-test:
-    name: Build and Test
+    name: Build and test Rust application
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -25,3 +25,12 @@ jobs:
         name: cargo test
         with:
           command: test
+
+  test-dockerfile:
+    name: Lint Dockerfile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run hadolint
+        # DL3007/DL3018 It's fine to keep using the latest stable image and packages
+        run: docker run --rm -i hadolint/hadolint:latest hadolint --ignore DL3007 --ignore DL3018 - < Dockerfile
