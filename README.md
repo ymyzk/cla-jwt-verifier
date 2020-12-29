@@ -57,7 +57,8 @@ cla-jwt-verifier reads configurations from environment variables.
 - `RUST_LOG` (optional)
 
 ## Docker
-The Docker image is also available on [Docker Hub](https://hub.docker.com/repository/docker/ymyzk/cla-jwt-verifier).
+The Docker image is available on [Docker Hub](https://hub.docker.com/repository/docker/ymyzk/cla-jwt-verifier) and
+[GitHub](https://github.com/users/ymyzk/packages/container/package/cla-jwt-verifier).
 
 ## Reference
 - [Validating JSON Web Tokens - Cloudflare Access](https://developers.cloudflare.com/access/setting-up-access/validate-jwt-tokens/)
