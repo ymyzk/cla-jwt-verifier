@@ -56,6 +56,11 @@ cla-jwt-verifier reads configurations from environment variables.
 - `APP_LISTEN` (optional)
 - `RUST_LOG` (optional)
 
+## Endpoints
+- GET `/auth`
+  - `Cf-Access-Jwt-Assertion` request header: JWT to be verified (required).
+  - Response status code: 200 only when the JWT is verified successfully.
+
 ## Docker
 The Docker image is available on [Docker Hub](https://hub.docker.com/repository/docker/ymyzk/cla-jwt-verifier) and
 [GitHub](https://github.com/users/ymyzk/packages/container/package/cla-jwt-verifier).
