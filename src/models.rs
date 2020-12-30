@@ -65,8 +65,8 @@ impl JWKSet {
 mod tests {
     use super::{JWK, JWKSet, KeyAlgorithm, KeyType};
 
-    #[tokio::test]
-    async fn test_find_jwk_finds_key() {
+    #[test]
+    fn test_find_jwk_finds_key() {
         let jwk1 = JWK {
             kty: KeyType::RSA,
             use_: Some("sig".to_string()),
@@ -88,8 +88,8 @@ mod tests {
         assert_eq!(jwks.find("key2"), Some(&jwk2));
     }
 
-    #[tokio::test]
-    async fn test_find_jwk_not_found() {
+    #[test]
+    fn test_find_jwk_not_found() {
         let jwk = JWK {
             kty: KeyType::RSA,
             use_: Some("sig".to_string()),
@@ -102,8 +102,8 @@ mod tests {
         assert!(jwks.find("key2").is_none());
     }
 
-    #[tokio::test]
-    async fn test_find_jwk_when_empty() {
+    #[test]
+    fn test_find_jwk_when_empty() {
         let jwks = JWKSet { keys: vec![] };
         assert!(jwks.find("kid").is_none());
     }
