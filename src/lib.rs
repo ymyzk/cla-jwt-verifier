@@ -2,7 +2,7 @@ pub mod models;
 
 use crate::models::{Claims, JWKSet};
 
-use log::{debug};
+use log::debug;
 use serde::Serialize;
 use std::collections::hash_map::{Entry, HashMap};
 use std::sync::Arc;
@@ -138,7 +138,7 @@ pub fn get_routes(
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{JWK, JWKSet, KeyAlgorithm, KeyType};
+    use crate::models::{JWKSet, KeyAlgorithm, KeyType, JWK};
     use mockito::{mock, server_url};
     use std::path::PathBuf;
     use tokio::fs;

@@ -63,7 +63,7 @@ impl JWKSet {
 
 #[cfg(test)]
 mod tests {
-    use super::{JWK, JWKSet, KeyAlgorithm, KeyType};
+    use super::{JWKSet, KeyAlgorithm, KeyType, JWK};
 
     #[test]
     fn test_find_jwk_finds_key() {
@@ -83,7 +83,9 @@ mod tests {
             n: "Yadafddsa8o0qAidfafad1321r8s".to_string(),
             e: "AQAB".to_string(),
         };
-        let jwks = JWKSet { keys: vec![jwk1.to_owned(), jwk2.to_owned()] };
+        let jwks = JWKSet {
+            keys: vec![jwk1.to_owned(), jwk2.to_owned()],
+        };
         assert_eq!(jwks.find("key1"), Some(&jwk1));
         assert_eq!(jwks.find("key2"), Some(&jwk2));
     }

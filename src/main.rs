@@ -1,6 +1,6 @@
 extern crate cla_jwt_verifier;
 
-use cla_jwt_verifier::{get_routes,init_cache};
+use cla_jwt_verifier::{get_routes, init_cache};
 use log::{debug, info};
 use std::collections::hash_map::HashMap;
 
