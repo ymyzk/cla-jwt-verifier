@@ -1,4 +1,6 @@
+use jsonwebtoken::DecodingKey;
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::HashMap;
 
 /// JWT Claims
 /// https://tools.ietf.org/html/rfc7519#section-4
@@ -58,6 +60,27 @@ impl JWKSet {
     /// there's no guarantee on which one is returned.
     pub fn find(&self, kid: &str) -> Option<&JWK> {
         self.keys.iter().find(|jwk| jwk.kid == Some(kid.into()))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct RSADecodingKeySet<'a> {
+    keys: HashMap<String, DecodingKey<'a>>,
+}
+
+impl<'a> RSADecodingKeySet<'a> {
+    pub fn new(jwks: JWKSet) -> Self {
+        RSADecodingKeySet {
+            keys: jwks.keys
+                .iter()
+                .filter(|k| k.kid.is_some())
+                .map(|k| (
+                        k.kid.to_owned().unwrap(),
+                        // TODO: Because of the limitation of DecodingKey, we need to use static tlifetime
+                        DecodingKey::from_rsa_components(&k.n.to_owned(), &k.e.to_owned()).into_static()
+                ))
+                .collect()
+        }
     }
 }
 
