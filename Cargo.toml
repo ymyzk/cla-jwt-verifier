@@ -16,7 +16,7 @@ log = "0.4"
 reqwest = { version = "0.10", features = ["json"] }
 serde = {version = "1.0", features = ["derive"] }
 tokio = { version = "0.2", features = ["macros", "time"] }
-warp = "0.2"
+warp = "0.3"
 
 [dev-dependencies]
 mockito = "0.28"
